@@ -1,0 +1,10 @@
+﻿[*.cs]
+
+# RCS1001: Add braces (when expression spans over multiple lines)
+dotnet_diagnostic.RCS1001.severity = none
+
+# CA1822: Mark members as static
+dotnet_diagnostic.CA1822.severity = none
+
+# IDE0251: Make member 'readonly'
+dotnet_diagnostic.IDE0251.severity = none
