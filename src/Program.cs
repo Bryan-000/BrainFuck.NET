@@ -28,6 +28,6 @@ if (compilationMode.Length >= 1 && compilationMode[0] == 'c')
 }
 else
 {
-    using Interpreter uwu = new();
+    Interpreter uwu = new();
     uwu.Execute(code);
 }

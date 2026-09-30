@@ -73,59 +73,31 @@ public struct Compiler
 
         GetReferences
         (
-            out var allocHGlobalRef, out var freeHGlobalRef,
             out var writeRef,        out var writeStrRef,
             out var readKeyRef,      out var get_KeyCharRef,
             out var consoleKeyInfoRef
         );
 
-        // field signature for a byte*
+        // add var signature for the Pointer variable
         BlobBuilder bytePtrSignature = new();
         new BlobEncoder(bytePtrSignature).
             FieldSignature().
                 Pointer().Byte();
 
-        // add memory field
-        var memField = metadata.AddFieldDefinition
-        (
-            attributes: FieldAttributes.Private | FieldAttributes.Static,
-            name: metadata.GetOrAddString("Memory"),
-            signature: metadata.GetOrAddBlob(bytePtrSignature)
-        );
-
-        // add memory field
-        var pointerField = metadata.AddFieldDefinition
-        (
-            attributes: FieldAttributes.Private | FieldAttributes.Static,
-            name: metadata.GetOrAddString("Pointer"),
-            signature: metadata.GetOrAddBlob(bytePtrSignature)
-        );
 
         // allocate the memory at the start of Main
         {
-            // Pointer = Memory = Marshal.AllocHGlobal(30_000)
+            // byte* Pointer = stackalloc byte[30_000];
             il.LoadConstantI4(30_000);
-            il.Call(allocHGlobalRef);
-            il.OpCode(ILOpCode.Dup);
-            il.OpCode(ILOpCode.Stsfld); il.Token(memField);
-            il.OpCode(ILOpCode.Stsfld); il.Token(pointerField);
-
-            // clear memory so its all zero
-            il.OpCode(ILOpCode.Ldsfld); il.Token(memField);
-            il.LoadConstantI4(0);
-            il.LoadConstantI4(30_000);
-            il.OpCode(ILOpCode.Initblk);
+            il.OpCode(ILOpCode.Conv_u);
+            il.OpCode(ILOpCode.Localloc);
+            il.StoreLocal(0);
         }
 
         WriteBrainfuckAsCil(code);
 
-        // free the memory once it finishes and wait for user input before exiting
+        // wait for user input before exiting
         {
-            // Marshal.FreeHGlobal(Memory)
-            il.OpCode(ILOpCode.Ldsfld); il.Token(memField);
-            il.Call(freeHGlobalRef);
-
-
             // Console.WriteLine("Press any key to exit...")
             il.LoadString(metadata.GetOrAddUserString("\nPress any key to exit..."));
             il.Call(writeStrRef);
@@ -151,8 +123,15 @@ public struct Compiler
                 );
 
         BlobBuilder localVarsSignature = new();
-        new BlobEncoder(localVarsSignature).LocalVariableSignature(1)
-            .AddVariable().Type().Type(consoleKeyInfoRef, true);
+        var localVarsEncoder = new BlobEncoder(localVarsSignature).LocalVariableSignature(2);
+
+        // Pointer
+        localVarsEncoder.AddVariable().Type().
+            Pointer().Byte();
+
+        // bullshit cuz of ','
+        localVarsEncoder.AddVariable().Type().
+                Type(consoleKeyInfoRef, true);
 
         return metadata.AddMethodDefinition
         (
@@ -168,8 +147,7 @@ public struct Compiler
             parameterList: default
         );
 
-        void GetReferences(out MemberReferenceHandle allocHGlobalRef, out MemberReferenceHandle freeHGlobalRef,
-                           out MemberReferenceHandle writeRef,        out MemberReferenceHandle writeStrRef,
+        void GetReferences(out MemberReferenceHandle writeRef,        out MemberReferenceHandle writeStrRef,
                            out MemberReferenceHandle readKeyRef,      out MemberReferenceHandle get_KeyCharRef,
                            out TypeReferenceHandle consoleKeyInfoRef
         )
@@ -183,14 +161,6 @@ public struct Compiler
                 publicKeyOrToken: metadata.GetOrAddBlob(new byte[] { 0xB7, 0x7A, 0x5C, 0x56, 0x19, 0x34, 0xE0, 0x89 }),
                 flags: default,
                 hashValue: default
-            );
-
-            // get marshal
-            var marshalRef = metadata.AddTypeReference
-            (
-                resolutionScope: mscorlibRef,
-                @namespace: metadata.GetOrAddString("System.Runtime.InteropServices"),
-                name: metadata.GetOrAddString("Marshal")
             );
 
             // get console
@@ -210,42 +180,6 @@ public struct Compiler
             );
 
             consoleKeyInfoRef = consoleKeyInfoRefLoc;
-
-            // get AllocHGlobal
-            BlobBuilder allocHGlobalSignature = new();
-            new BlobEncoder(allocHGlobalSignature).
-                MethodSignature().
-                    Parameters
-                    (
-                        parameterCount: 1,
-                        returnType => returnType.Type().IntPtr(),
-                        parameters => parameters.AddParameter().Type().Int32()
-                    );
-
-            allocHGlobalRef = metadata.AddMemberReference
-            (
-                parent: marshalRef,
-                name: metadata.GetOrAddString("AllocHGlobal"),
-                signature: metadata.GetOrAddBlob(allocHGlobalSignature)
-            );
-
-            // get FreeHGlobal
-            BlobBuilder freeHGlobalSignature = new();
-            new BlobEncoder(freeHGlobalSignature).
-                MethodSignature().
-                    Parameters
-                    (
-                        parameterCount: 1,
-                        returnType => returnType.Void(),
-                        parameters => parameters.AddParameter().Type().IntPtr()
-                    );
-
-            freeHGlobalRef = metadata.AddMemberReference
-            (
-                parent: marshalRef,
-                name: metadata.GetOrAddString("FreeHGlobal"),
-                signature: metadata.GetOrAddBlob(freeHGlobalSignature)
-            );
 
             // get Write(string)
             BlobBuilder writeStrSignature = new();
@@ -348,27 +282,27 @@ public struct Compiler
                 {
                     case '>':
                         // Pointer = Pointer + n;
-                        il.OpCode(ILOpCode.Ldsfld); il.Token(pointerField);
+                        il.LoadLocal(0);
                         il.LoadConstantI4(CountAndMove(code, '>'));
                         il.OpCode(ILOpCode.Add);
 
-                        il.OpCode(ILOpCode.Stsfld); il.Token(pointerField);
+                        il.StoreLocal(0);
                     break;
 
                     case '<':
                         // Pointer = Pointer - n;
-                        il.OpCode(ILOpCode.Ldsfld); il.Token(pointerField);
+                        il.LoadLocal(0);
                         il.LoadConstantI4(CountAndMove(code, '<'));
                         il.OpCode(ILOpCode.Sub);
 
-                        il.OpCode(ILOpCode.Stsfld); il.Token(pointerField);
+                        il.StoreLocal(0);
                     break;
 
 
 
                     case '+':
                         // *Pointer = *Pointer + n
-                        il.OpCode(ILOpCode.Ldsfld); il.Token(pointerField);
+                        il.LoadLocal(0);
                         il.OpCode(ILOpCode.Dup);
 
                         il.OpCode(ILOpCode.Ldind_u1);
@@ -382,7 +316,7 @@ public struct Compiler
 
                     case '-':
                         // *Pointer = *Pointer - n
-                        il.OpCode(ILOpCode.Ldsfld); il.Token(pointerField);
+                        il.LoadLocal(0);
                         il.OpCode(ILOpCode.Dup);
 
                         il.OpCode(ILOpCode.Ldind_u1);
@@ -398,24 +332,34 @@ public struct Compiler
 
                     case '.':
                         // Console.Write((char)*Pointer)
-                        il.OpCode(ILOpCode.Ldsfld); il.Token(pointerField);
+                        il.LoadLocal(0);
                         il.OpCode(ILOpCode.Ldind_u1);
 
                         il.Call(writeRef);
                     break;
 
                     case ',':
-                        // *Pointer = (byte)Console.ReadKey().KeyChar;
-                        il.OpCode(ILOpCode.Ldsfld); il.Token(pointerField);
+                        // *Pointer = (byte)(Console.ReadKey().KeyChar if is not '\r' else '\n');
+                        il.LoadLocal(0);
 
                         il.OpCode(ILOpCode.Ldc_i4_0);
                         il.Call(readKeyRef);
 
-                        il.StoreLocal(0); // this is bullshit
-                        il.LoadLocalAddress(0);
+                        il.StoreLocal(1); // this is bullshit
+                        il.LoadLocalAddress(1);
 
                         il.Call(get_KeyCharRef);
 
+                        // if (char == '\r') char = '\n';
+                        LabelHandle mraow = il.DefineLabel();
+                        il.OpCode(ILOpCode.Dup);
+                        il.LoadConstantI4(13); // \r
+                        il.Branch(ILOpCode.Bne_un_s, mraow);
+
+                        il.OpCode(ILOpCode.Pop);
+                        il.LoadConstantI4(10); // \n
+
+                        il.MarkLabel(mraow);
                         il.OpCode(ILOpCode.Conv_u1);
                         il.OpCode(ILOpCode.Stind_i1);
                     break;
@@ -455,7 +399,7 @@ public struct Compiler
 
                         il.MarkLabel(pair.Left);
 
-                        il.OpCode(ILOpCode.Ldsfld); il.Token(pointerField);
+                        il.LoadLocal(0);
                         il.OpCode(ILOpCode.Ldind_u1);
                         il.OpCode(ILOpCode.Ldc_i4_0);
 

@@ -1,26 +1,11 @@
 ﻿namespace BrainFuck.NET;
 
-using System.Runtime.InteropServices;
-
-public unsafe struct Interpreter : IDisposable
+public unsafe struct Interpreter
 {
-    public Interpreter()
-    {
-        Memory = (byte*)NativeMemory.AllocZeroed(30_000);
-        Pointer = Memory;
-    }
-
-    public void Dispose()
-    {
-        NativeMemory.Free(Memory);
-        Pointer = Memory = null;
-    }
-
-    byte* Memory;
-    byte* Pointer;
-
     public void Execute(ReadOnlySpan<char> code)
     {
+        byte* Pointer = stackalloc byte[30_000];
+
         for (int i = 0; i < code.Length; i++)
         {
             switch (code[i])
@@ -48,7 +33,11 @@ public unsafe struct Interpreter : IDisposable
                 break;
 
                 case ',':
-                    *Pointer = (byte)Console.ReadKey().KeyChar;
+                    char input = Console.ReadKey().KeyChar;
+                    if (input == '\r')
+                        input = '\n';
+
+                    *Pointer = (byte)input;
                 break;
 
 
