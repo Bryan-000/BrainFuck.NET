@@ -31,3 +31,6 @@ else
     Interpreter uwu = new();
     uwu.Execute(code);
 }
+
+Console.WriteLine("\nPress any key to exit...");
+Console.ReadKey();
