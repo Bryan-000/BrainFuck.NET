@@ -1,8 +1,8 @@
 ﻿namespace BrainFuck.NET;
 
-public unsafe struct Interpreter
+public static unsafe class Interpreter
 {
-    public void Execute(ReadOnlySpan<char> code)
+    public static void Exec(ReadOnlySpan<char> code)
     {
         byte* Pointer = stackalloc byte[30_000];
 

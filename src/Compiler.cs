@@ -5,9 +5,9 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
-public struct Compiler
+public static class Compiler
 {
-    public void CompileTo(string assemblyName, ReadOnlySpan<char> code)
+    public static void CompileTo(string assemblyName, ReadOnlySpan<char> code)
     {
         MetadataBuilder metadata = new();
         BlobBuilder ilBuilder = new();
@@ -34,7 +34,7 @@ public struct Compiler
         }
     }
 
-    TypeDefinitionHandle CreateAsm(string name, MetadataBuilder metadata)
+    static TypeDefinitionHandle CreateAsm(string name, MetadataBuilder metadata)
     {
         metadata.AddAssembly
         (
@@ -66,7 +66,7 @@ public struct Compiler
         );
     }
 
-    MethodDefinitionHandle CreateMembers(MetadataBuilder metadata, BlobBuilder ilBuilder, ReadOnlySpan<char> code)
+    static MethodDefinitionHandle CreateMembers(MetadataBuilder metadata, BlobBuilder ilBuilder, ReadOnlySpan<char> code)
     {
         MethodBodyStreamEncoder methodBodyStream = new(ilBuilder);
         InstructionEncoder il = new(new(), new());

@@ -19,8 +19,7 @@ if (compilationMode.Length >= 1 && compilationMode[0] == 'c')
 {
     Stopwatch watch = Stopwatch.StartNew();
     {
-        Compiler mraow = new();
-        mraow.CompileTo(name, code);
+        Compiler.CompileTo(name, code);
     }
     watch.Stop();
 
@@ -28,8 +27,7 @@ if (compilationMode.Length >= 1 && compilationMode[0] == 'c')
 }
 else
 {
-    Interpreter uwu = new();
-    uwu.Execute(code);
+    Interpreter.Exec(code);
 }
 
 Console.WriteLine("\nPress any key to exit...");
